@@ -1,0 +1,122 @@
+name: rustdoc-wiki
+description: Publish a Rust workspace's API documentation to the repository's GitHub wiki
+author: Philip Taron
+branding:
+  icon: book-open
+  color: orange
+
+inputs:
+  version:
+    description: >-
+      Name for this set of docs: the first part of every page name, and the wiki directory the
+      pages go in. Use `latest` for the default branch and a release tag for a snapshot.
+    default: latest
+  packages:
+    description: >-
+      Workspace packages to document, separated by commas or newlines. The default is every
+      library crate in the workspace.
+    default: ''
+  workspace:
+    description: Directory of the Cargo workspace.
+    default: .
+  directory:
+    description: The wiki directory this action owns. Everything under `<directory>/<version>/` is replaced.
+    default: api
+  private-items:
+    description: Document private items too.
+    default: 'false'
+  json-dir:
+    description: >-
+      Use the rustdoc JSON files in this directory instead of building. Their format_version has
+      to match the nightly this action pins.
+    default: ''
+  dry-run:
+    description: Report what would change without committing or pushing.
+    default: 'false'
+  github-token:
+    description: 'Token used to push to the wiki. It needs `contents: write`.'
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" != Linux ]; then
+          echo "::error::rustdoc-wiki supports Linux runners only (this is $RUNNER_OS)."
+          exit 1
+        fi
+        if command -v nix >/dev/null; then
+          echo "have_nix=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "have_nix=false" >> "$GITHUB_OUTPUT"
+        fi
+      id: runner
+
+    - name: Install Nix
+      if: steps.runner.outputs.have_nix != 'true'
+      uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+    - name: Fetch the pinned nightly toolchain
+      if: inputs.json-dir == ''
+      id: toolchain
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        path=$(nix --extra-experimental-features 'nix-command flakes' \
+          build "$ACTION_PATH#toolchain" --no-link --print-out-paths)
+        echo "path=$path" >> "$GITHUB_OUTPUT"
+
+    - name: Get rustdoc-wiki
+      id: binary
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ACTION_REPOSITORY: ${{ github.action_repository }}
+      run: |
+        # The release that matches this checkout of the action. Commits that are not released,
+        # such as a branch or a local `uses: ./`, are built from source instead.
+        version=$(sed -n 's/^version = "\(.*\)"$/\1/p' "$ACTION_PATH/Cargo.toml" | head -n 1)
+        repository=${ACTION_REPOSITORY:-philiptaron/rustdoc-wiki-action}
+        case "$(uname -m)" in
+          x86_64) arch=x86_64 ;;
+          aarch64 | arm64) arch=aarch64 ;;
+          *) echo "::error::unsupported architecture $(uname -m)"; exit 1 ;;
+        esac
+        url="https://github.com/$repository/releases/download/v$version/rustdoc-wiki-$arch-linux.tar.gz"
+        dir="$RUNNER_TEMP/rustdoc-wiki"
+        mkdir -p "$dir"
+        if curl --fail --silent --show-error --location "$url" | tar -xz -C "$dir"; then
+          echo "path=$dir/rustdoc-wiki" >> "$GITHUB_OUTPUT"
+        else
+          echo "No release binary at $url; building from source with Nix."
+          out=$(nix --extra-experimental-features 'nix-command flakes' \
+            build "$ACTION_PATH#rustdoc-wiki" --no-link --print-out-paths)
+          echo "path=$out/bin/rustdoc-wiki" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Publish the API docs to the wiki
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        BINARY: ${{ steps.binary.outputs.path }}
+        TOOLCHAIN: ${{ steps.toolchain.outputs.path }}
+        VERSION: ${{ inputs.version }}
+        PACKAGES: ${{ inputs.packages }}
+        WORKSPACE: ${{ inputs.workspace }}
+        DIRECTORY: ${{ inputs.directory }}
+        PRIVATE_ITEMS: ${{ inputs.private-items }}
+        JSON_DIR: ${{ inputs.json-dir }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        args=(run --workspace "$WORKSPACE" --version "$VERSION" --directory "$DIRECTORY")
+        if [ -n "$TOOLCHAIN" ]; then args+=(--toolchain "$TOOLCHAIN"); fi
+        if [ -n "$JSON_DIR" ]; then args+=(--json-dir "$JSON_DIR"); fi
+        if [ "$PRIVATE_ITEMS" = true ]; then args+=(--private-items); fi
+        if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+        # Package names may be separated by commas, spaces or newlines.
+        packages=$(printf '%s' "$PACKAGES" | tr -s ' \n' ',' | sed 's/^,//; s/,$//')
+        if [ -n "$packages" ]; then args+=(--package "$packages"); fi
+        "$BINARY" "${args[@]}"

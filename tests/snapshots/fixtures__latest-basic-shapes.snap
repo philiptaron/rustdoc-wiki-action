@@ -1,0 +1,121 @@
+---
+source: tests/fixtures.rs
+---
+# `basic::shapes`
+
+Geometry.
+
+## Structs
+
+### struct `Circle`
+
+```rust
+pub struct Circle {
+    pub radius: f64,
+    // some fields omitted
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L41-L45)
+
+A circle.
+
+**Fields**
+
+- `pub radius: f64`
+
+  Radius of the circle.
+
+#### fn `Circle::new`
+
+```rust
+impl Circle {
+    pub fn new(radius: f64) -> Self;
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L49-L51)
+
+Creates a circle. Links to [`Circle`](latest-basic-shapes#struct-circle) and [`Shape::area`](latest-basic-shapes#fn-shapearea).
+
+**Trait implementations**
+
+- `impl Clone for Circle`
+- `impl Debug for Circle`
+- `impl PartialEq for Circle`
+- `impl Shape for Circle`
+- `impl StructuralPartialEq for Circle`
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `CloneToUninit`, `From<T>`, `Into<U>`, `ToOwned`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+## Traits
+
+### trait `Shape`
+
+```rust
+pub trait Shape: std::fmt::Debug
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L23-L37)
+
+Something with an area.
+
+**Associated types**
+
+#### type `Shape::Unit`
+
+```rust
+type Unit;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L25)
+
+The unit of measure.
+
+**Associated constants**
+
+#### const `Shape::SIDES`
+
+```rust
+const SIDES: Option<u32> = None;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L28)
+
+Number of sides, if known.
+
+**Required methods**
+
+#### fn `Shape::area`
+
+```rust
+fn area(&self) -> f64;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L31)
+
+Area of the shape.
+
+**Provided methods**
+
+#### fn `Shape::describe`
+
+```rust
+fn describe(&self) -> String;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L34-L36)
+
+A provided method with a default body.

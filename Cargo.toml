@@ -1,0 +1,20 @@
+[package]
+name = "rustdoc-wiki"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+description = "Sync Rust documentation to a GitHub wiki"
+repository = "https://github.com/philiptaron/rustdoc-wiki-action"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+pulldown-cmark = { version = "0.13", default-features = false }
+# Must match the `format_version` emitted by the nightly pinned in flake.nix.
+rustdoc-types = "=0.61.0"
+serde_json = "1"
+tempfile = "3"
+
+[dev-dependencies]
+insta = "1"

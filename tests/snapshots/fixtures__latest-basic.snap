@@ -1,0 +1,425 @@
+---
+source: tests/fixtures.rs
+---
+# `basic`
+
+Version 0.3.1
+
+Crate docs for `basic`.
+
+## Overview
+
+Start with [`Config`](latest-basic#struct-config), then look at [`util::helper`](latest-basic-util#fn-helper) and the [`Shape`](latest-basic-shapes#trait-shape) trait.
+External items work too: [`Vec`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html) and [`std::collections::HashMap`](https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html).
+
+## Example
+
+```rust
+let config = Config::new("demo");
+# not hidden
+assert_eq!(config.name(), "demo");
+```
+
+## Modules
+
+- [`shapes`](latest-basic-shapes) — Geometry.
+- [`util`](latest-basic-util) — Utilities.
+
+## Re-exports
+
+- `pub use std::collections::HashMap` — [`HashMap`](https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html)
+- `pub use shapes::*` — [`Shape`](latest-basic-shapes#trait-shape), [`Circle`](latest-basic-shapes#struct-circle)
+
+## Macros
+
+### macro `hello!`
+
+```rust
+#[macro_export]
+macro_rules! hello {
+    () => { ... };
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L195-L199)
+
+Says hello.
+
+```rust
+hello!();
+```
+
+## Structs
+
+### struct `Config`
+
+```rust
+#[must_use]
+pub struct Config<T = ()> {
+    pub extra: T,
+    pub mode: Mode,
+    // some fields omitted
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L90-L96)
+
+Runtime configuration.
+
+Built with [`Config::new`](latest-basic#fn-confignew). See the [`Mode`](latest-basic#enum-mode) enum, [the util module](latest-basic-util), and
+[a reference-style link](latest-basic-util#fn-helper).
+
+#### Errors
+
+Never fails.
+
+[helper]: crate::util::helper
+
+**Fields**
+
+- `pub extra: T`
+
+  User supplied extra data.
+- `pub mode: Mode`
+
+  How to run.
+
+#### fn `Config::new`
+
+```rust
+impl<T: Default> Config<T> {
+    pub fn new(name: &str) -> Self;
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L104-L106)
+
+Creates a config with the given name.
+
+```rust
+let c = basic::Config::<()>::new("x");
+```
+
+#### fn `Config::name`
+
+```rust
+impl<T> Config<T> {
+    pub fn name(&self) -> &str;
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L111-L113)
+
+The name.
+
+#### fn `Config::into_extra`
+
+```rust
+impl<T> Config<T> {
+    pub const fn into_extra(self) -> T;
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L116-L118)
+
+Consumes the config and returns the extra data.
+
+**Trait implementations**
+
+- `impl<T: Debug> Debug for Config<T>`
+- `impl<T: Default> Default for Config<T>`
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+### struct `Marker`
+
+```rust
+pub struct Marker;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L149)
+
+A unit struct.
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+### struct `Pair`
+
+```rust
+pub struct Pair<A, B>(pub A, pub B);
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L152)
+
+A tuple struct.
+
+**Fields**
+
+- `pub 0: A`
+- `pub 1: B`
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+### struct `Reexported`
+
+```rust
+pub struct Reexported {
+    pub value: i32,
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L65-L68)
+
+Defined in a private module, re-exported below.
+
+**Fields**
+
+- `pub value: i32`
+
+  A public field.
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+## Enums
+
+### enum `Mode`
+
+```rust
+#[non_exhaustive]
+pub enum Mode {
+    Idle,
+    Workers(usize),
+    Custom { level: u8, label: String },
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L124-L137)
+
+How to run.
+
+**Variants**
+
+- `Idle`
+
+  Do nothing.
+- `Workers(usize)`
+
+  Run with a number of workers.
+- `Custom { level: u8, label: String }`
+
+  Run with named options.
+
+**Trait implementations**
+
+- `impl Clone for Mode`
+- `impl Debug for Mode`
+- `impl Default for Mode`
+- `impl Eq for Mode`
+- `impl PartialEq for Mode`
+- `impl StructuralPartialEq for Mode`
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `CloneToUninit`, `From<T>`, `Into<U>`, `ToOwned`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+## Unions
+
+### union `Bits`
+
+```rust
+#[repr(C)]
+pub union Bits {
+    pub int: u32,
+    pub float: f32,
+}
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L141-L146)
+
+Bits and pieces.
+
+**Fields**
+
+- `pub int: u32`
+
+  As an integer.
+- `pub float: f32`
+
+  As a float.
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+## Functions
+
+### fn `c_abi`
+
+```rust
+pub extern "C" fn c_abi(x: i32) -> i32
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L185-L187)
+
+A C ABI function.
+
+### fn `convert`
+
+```rust
+pub fn convert<'a, T, U>(input: &'a T, f: impl Fn(&T) -> U) -> Option<U>
+where
+    T: Clone + Send + 'a,
+    U: Into<String>,
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L157-L163)
+
+Generic function with bounds and a where clause.
+
+Calls [`inlined`](latest-basic#fn-inlined) and returns a [`Mode`](latest-basic#enum-mode).
+
+### fn `ffi`
+
+```rust
+pub async unsafe fn ffi()
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L182)
+
+An async, unsafe, extern function.
+
+### fn `inlined`
+
+```rust
+pub fn inlined()
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L71)
+
+Also from the private module.
+
+### fn `old_convert`
+
+```rust
+pub fn old_convert()
+```
+
+> **Deprecated** since 0.2.0: use `convert` instead
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L179)
+
+Old and busted.
+
+## Type aliases
+
+### type `Table`
+
+```rust
+pub type Table<V> = HashMap<String, V>;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L175)
+
+A type alias.
+
+## Constants
+
+### const `LIMIT`
+
+```rust
+pub const LIMIT: usize = 1_024usize;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L166)
+
+A constant.
+
+## Statics
+
+### static `COUNTER`
+
+```rust
+pub static mut COUNTER: u64;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L172)
+
+A mutable static.
+
+### static `GREETING`
+
+```rust
+pub static GREETING: &str;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/lib.rs#L169)
+
+A static.

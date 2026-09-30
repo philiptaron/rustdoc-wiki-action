@@ -1,0 +1,52 @@
+---
+source: tests/fixtures.rs
+---
+# `basic::util`
+
+Utilities.
+
+Back to [the crate](latest-basic) and [`crate::Config`](latest-basic#struct-config).
+
+## Modules
+
+- [`nested`](latest-basic-util-nested) — Nested utilities. Deeply nested.
+
+## Structs
+
+### struct `Helper`
+
+```rust
+pub struct Helper;
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/util.rs#L11)
+
+A helper struct.
+
+<details>
+<summary>Auto trait implementations</summary>
+
+`Freeze`, `RefUnwindSafe`, `Send`, `Sync`, `Unpin`, `UnsafeUnpin`, `UnwindSafe`
+
+</details>
+
+<details>
+<summary>Blanket implementations</summary>
+
+`Any`, `Borrow<T>`, `BorrowMut<T>`, `From<T>`, `Into<U>`, `TryFrom<U>`, `TryInto<U>`
+
+</details>
+
+## Functions
+
+### fn `helper`
+
+```rust
+pub fn helper()
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/util.rs#L8)
+
+Does a helpful thing.
+
+Related: [`Helper`](latest-basic-util#struct-helper), [`super::Mode::Idle`](latest-basic#enum-mode), [`Vec::push`](https://doc.rust-lang.org/stable/std/vec/struct.Vec.html#method.push), and [`missing`].

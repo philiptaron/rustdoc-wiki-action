@@ -1,0 +1,19 @@
+---
+source: tests/fixtures.rs
+---
+# `basic::util::nested`
+
+Nested utilities.
+Deeply nested.
+
+## Functions
+
+### fn `deep`
+
+```rust
+pub fn deep()
+```
+
+[source](https://github.com/example/repo/blob/0123abc/src/util.rs#L18)
+
+A deep function.
