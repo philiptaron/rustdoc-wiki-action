@@ -5,9 +5,12 @@
 //! 1. **Plan.** Walk the module tree and decide which page every item lives on ("home"), expanding
 //!    `pub use` re-exports. An item that is only reachable through a re-export from a private
 //!    module is documented where it is re-exported, like rustdoc does.
-//! 2. **Emit.** Write the Markdown. A link to an item needs the anchor GitHub will give its heading,
-//!    which depends on every heading before it on that page. So the pages are emitted twice: the
-//!    first pass records each item's anchor, and the second pass uses them.
+//! 2. **Emit.** Write the Markdown. A link to an item needs the anchor GitHub will give its heading
+//!    (see [`names`]), which depends on every heading before it on that page. So the pages are
+//!    emitted twice: the first pass records each item's anchor, and the second pass uses them.
+//!
+//! Doc comments are processed by [`docs`], and links to items that have no page here by
+//! [`external`].
 
 use std::collections::{HashMap, HashSet};
 
@@ -33,12 +36,15 @@ pub struct Page {
     pub markdown: String,
 }
 
-/// Parses rustdoc JSON and checks that its `format_version` is the one this build understands.
+/// Parses rustdoc JSON and checks that its `format_version` equals
+/// [`rustdoc_types::FORMAT_VERSION`], the one this build understands.
 pub fn load(json: &[u8]) -> Result<Crate> {
     let unsupported = |found: u64| {
         anyhow::anyhow!(
             "unsupported rustdoc JSON format_version {found}: this build understands version \
-             {FORMAT_VERSION}. Build the docs with the nightly toolchain this action pins."
+             {FORMAT_VERSION}. Build the docs with the nightly toolchain this action pins; see \
+             {}#requirements-and-limitations",
+            crate::HOMEPAGE
         )
     };
     match serde_json::from_slice::<Crate>(json) {
@@ -473,8 +479,11 @@ impl Emit<'_> {
         let Some(text) = item.docs.as_deref() else {
             return String::new();
         };
-        let first = docs::summary(text);
-        docs::process(&first, &item.links, 0, &mut |dest, id| self.href(id, dest)).markdown
+        // Process everything and then take the first paragraph, so that a reference-style link in
+        // that paragraph has its definition (which is usually further down) resolved.
+        let processed =
+            docs::process(text, &item.links, 0, &mut |dest, id| self.href(id, dest)).markdown;
+        docs::summary(&processed)
     }
 
     fn source_link(&self, item: &Item) -> Option<String> {

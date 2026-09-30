@@ -1,8 +1,10 @@
-//! URLs for items that are not documented on the wiki: the standard library and dependencies.
+//! URLs for items that are not documented on the wiki: the standard library, and dependencies,
+//! which are linked on [docs.rs](https://docs.rs).
 
 use rustdoc_types::{Crate, Id, ItemKind};
 
-/// The standard library is linked at its stable docs, which is what most readers use.
+/// The standard library is linked at its [stable docs](https://doc.rust-lang.org/stable/std/),
+/// which is what most readers use.
 const STABLE_ROOT: &str = "https://doc.rust-lang.org/stable/";
 
 /// Crates whose docs live under [`STABLE_ROOT`].
@@ -52,6 +54,8 @@ pub fn url(krate: &Crate, id: Id, written: &str) -> Option<String> {
     let name = path.last()?.clone();
 
     let sysroot = is_sysroot(&ext.name);
+    // The URL of the crate's own docs, which every item's path continues from. A crate's
+    // `html_root_url` (and docs.rs) is the directory that contains the crate's directory.
     let root = if sysroot {
         let top = if matches!(ext.name.as_str(), "std" | "core" | "alloc") {
             "std"
@@ -61,11 +65,12 @@ pub fn url(krate: &Crate, id: Id, written: &str) -> Option<String> {
         path[0] = top.to_string();
         format!("{STABLE_ROOT}{top}/")
     } else {
-        match ext.html_root_url.as_deref().filter(|u| !u.is_empty()) {
+        let base = match ext.html_root_url.as_deref().filter(|u| !u.is_empty()) {
             Some(url) if url.ends_with('/') => url.to_string(),
             Some(url) => format!("{url}/"),
             None => format!("https://docs.rs/{}/latest/", ext.name),
-        }
+        };
+        format!("{base}{}/", ext.name)
     };
 
     if sysroot {
@@ -152,5 +157,112 @@ mod tests {
         assert_eq!(written_path("`Vec::push()`"), ["Vec", "push"]);
         assert_eq!(written_path("vec!"), ["vec"]);
         assert_eq!(written_path("crate::a#anchor"), ["crate", "a"]);
+    }
+
+    /// A crate with two external crates: `serde` (id 5, docs.rs) and `alloc` (id 3, standard).
+    fn krate(serde_root: Option<&str>) -> Crate {
+        serde_json::from_value(serde_json::json!({
+            "root": 0, "crate_version": null, "includes_private": false, "index": {},
+            "paths": {
+                "1": {"crate_id": 5, "path": ["serde"], "kind": "module"},
+                "2": {"crate_id": 5, "path": ["serde", "de"], "kind": "module"},
+                "3": {"crate_id": 5, "path": ["serde", "de", "Deserialize"], "kind": "trait"},
+                "4": {"crate_id": 5, "path": ["serde", "de", "Deserialize", "deserialize"], "kind": "function"},
+                "5": {"crate_id": 5, "path": ["serde", "Value"], "kind": "enum"},
+                "6": {"crate_id": 5, "path": ["serde", "Value", "Null"], "kind": "variant"},
+                "7": {"crate_id": 3, "path": ["alloc", "vec", "Vec"], "kind": "struct"},
+                "8": {"crate_id": 3, "path": ["alloc", "vec", "Vec", "push"], "kind": "function"},
+                "9": {"crate_id": 1, "path": ["std", "collections", "hash", "map", "HashMap"], "kind": "struct"},
+                "10": {"crate_id": 2, "path": ["u32"], "kind": "primitive"},
+                "11": {"crate_id": 0, "path": ["mine", "Local"], "kind": "struct"}
+            },
+            "external_crates": {
+                "1": {"name": "std", "html_root_url": null, "path": "/std"},
+                "2": {"name": "core", "html_root_url": null, "path": "/core"},
+                "3": {"name": "alloc", "html_root_url": null, "path": "/alloc"},
+                "5": {"name": "serde", "html_root_url": serde_root, "path": "/serde"}
+            },
+            "target": {"triple": "x86_64-unknown-linux-gnu", "target_features": []},
+            "format_version": rustdoc_types::FORMAT_VERSION
+        }))
+        .expect("a valid crate")
+    }
+
+    fn url_of(krate: &Crate, id: u32, written: &str) -> Option<String> {
+        url(krate, Id(id), written)
+    }
+
+    #[test]
+    fn dependencies_link_to_docs_rs_below_the_crate_name() {
+        let k = krate(None);
+        assert_eq!(
+            url_of(&k, 1, "serde").as_deref(),
+            Some("https://docs.rs/serde/latest/serde/index.html")
+        );
+        assert_eq!(
+            url_of(&k, 2, "serde::de").as_deref(),
+            Some("https://docs.rs/serde/latest/serde/de/index.html")
+        );
+        assert_eq!(
+            url_of(&k, 3, "`serde::de::Deserialize`").as_deref(),
+            Some("https://docs.rs/serde/latest/serde/de/trait.Deserialize.html")
+        );
+    }
+
+    #[test]
+    fn a_crates_html_root_url_is_used_when_it_has_one() {
+        for root in [
+            "https://docs.rs/serde/1.0.0",
+            "https://docs.rs/serde/1.0.0/",
+        ] {
+            let k = krate(Some(root));
+            assert_eq!(
+                url_of(&k, 3, "Deserialize").as_deref(),
+                Some("https://docs.rs/serde/1.0.0/serde/de/trait.Deserialize.html"),
+                "{root}"
+            );
+        }
+    }
+
+    #[test]
+    fn members_link_to_an_anchor_on_their_parent() {
+        let k = krate(None);
+        assert_eq!(
+            url_of(&k, 4, "`Deserialize::deserialize`").as_deref(),
+            Some("https://docs.rs/serde/latest/serde/de/trait.Deserialize.html#method.deserialize")
+        );
+        assert_eq!(
+            url_of(&k, 6, "`Value::Null`").as_deref(),
+            Some("https://docs.rs/serde/latest/serde/enum.Value.html#variant.Null")
+        );
+        assert_eq!(
+            url_of(&k, 8, "`Vec::push`").as_deref(),
+            Some("https://doc.rust-lang.org/stable/std/vec/struct.Vec.html#method.push")
+        );
+    }
+
+    #[test]
+    fn the_standard_library_is_linked_at_its_stable_docs() {
+        let k = krate(None);
+        assert_eq!(
+            url_of(&k, 7, "`Vec`").as_deref(),
+            Some("https://doc.rust-lang.org/stable/std/vec/struct.Vec.html")
+        );
+        assert_eq!(
+            url_of(&k, 10, "u32").as_deref(),
+            Some("https://doc.rust-lang.org/stable/std/primitive.u32.html")
+        );
+        // Defined in a private module; the path the author wrote is the page that exists.
+        assert_eq!(
+            url_of(&k, 9, "`std::collections::HashMap`").as_deref(),
+            Some("https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html")
+        );
+    }
+
+    #[test]
+    fn local_and_unknown_items_have_no_external_url() {
+        let k = krate(None);
+        assert_eq!(url_of(&k, 11, "Local"), None);
+        assert_eq!(url_of(&k, 99, "Nope"), None);
     }
 }

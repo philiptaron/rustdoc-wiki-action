@@ -1,7 +1,10 @@
 //! Page names and heading anchors.
 //!
 //! GitHub identifies a wiki page by its file basename alone and derives heading anchors from the
-//! heading text (see DESIGN.md, "Wiki behavior"). Every rule that affects a link target lives here.
+//! heading text (see [DESIGN.md, "Wiki behavior"][wiki-behavior]). Every rule that affects a link
+//! target lives here.
+//!
+//! [wiki-behavior]: https://github.com/philiptaron/rustdoc-wiki-action/blob/HEAD/DESIGN.md#wiki-behavior-verified
 
 use std::collections::HashMap;
 

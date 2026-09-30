@@ -1,9 +1,15 @@
 # Design
 
-Status: the MVP is implemented and its tests pass locally (`nix flake check` on aarch64-darwin). It
-has not run on GitHub yet: the workflows, the static Linux build and the action itself are
-untested until the first push. Items marked **(decided)** were chosen explicitly in the design
-interview; **(proposed)** items are my extrapolation and have not been confirmed.
+This records the decisions behind [rustdoc-wiki-action](README.md) and why they were made. The
+README covers using it; the generated [API documentation][api-docs] covers the code.
+
+Status: the MVP is implemented and running. [CI](.github/workflows/ci.yml) passes on x86_64 and
+aarch64 Linux, and [this repository's own docs](.github/workflows/docs.yml) are published to its
+wiki by the action: every internal link and anchor on those pages was checked against GitHub's
+rendering. Not exercised yet: the [release workflow](.github/workflows/release.yml), the action's
+binary-download branch, the moving major tag, and release snapshots on GitHub. Items marked
+**(decided)** were chosen explicitly in the design interview; **(proposed)** items are my
+extrapolation and have not been confirmed.
 
 ## Goal
 
@@ -15,16 +21,16 @@ GitHub wiki. It runs on CI for the default branch (`latest`) and optionally on r
 
 | Area | Decision |
 | --- | --- |
-| Input | rustdoc JSON (`cargo rustdoc -- -Z unstable-options --output-format json`), rendered to Markdown by us |
-| Implementation | Rust binary, shipped via a composite action |
-| Toolchain | Nix pins the nightly. The flake is the lock, so the action's ref decides both the nightly and the matching `rustdoc-types` |
+| Input | [rustdoc JSON][rustdoc-json] (`cargo rustdoc -- -Z unstable-options --output-format json`), rendered to Markdown by us |
+| Implementation | Rust binary, shipped via a composite action ([`action.yml`](action.yml)) |
+| Toolchain | Nix pins the nightly. The [flake](flake.nix) is the lock, so the action's ref decides both the nightly and the matching [`rustdoc-types`][rustdoc-types] |
 | Distribution | Prebuilt Linux binaries attached to GitHub Releases, built with Nix `pkgsStatic` and checked for no `/nix/store` references. Nix supplies the toolchain at run time. macOS and Windows runners are not supported |
 | Page layout | One page per module |
 | Wiki ownership | A configurable directory (default `api/`) plus a managed region of `_Sidebar.md` |
-| Naming | `api/<version>/<version>-<crate>-<mod>-<submod>.md`, with the version in every name, `latest` included. Revised after the wiki spike: the original plan (`api/<version>/<crate>-<mod>.md`) collides across versions, because a wiki page's name is its basename (see "Wiki behavior") |
+| Naming | `api/<version>/<version>-<crate>-<mod>-<submod>.md`, with the version in every name, `latest` included. Revised after the wiki spike: the original plan (`api/<version>/<crate>-<mod>.md`) collides across versions, because a wiki page's name is its basename (see [Wiki behavior](#wiki-behavior-verified)) |
 | Versions | `version` input, default `latest`. The workflow owns the triggers. A run replaces `api/<version>/` wholesale, even for an existing snapshot |
 | Scope | `packages` input (default: all workspace lib crates). Public items only by default (`private-items` opts in) |
-| Features | Honor each crate's `[package.metadata.docs.rs]`. No feature inputs |
+| Features | Honor each crate's [`[package.metadata.docs.rs]`][docs-rs-metadata]. No feature inputs |
 | Page content | Signatures, docs, source links, trait impls per type, a `deprecated` note. `cfg`/feature badges are cut from the MVP |
 | Escape hatch | `json-dir` input skips the build. No cargo-args or toolchain override in v1 |
 | Target | Current repo's wiki only, via the workflow token (`contents: write`) |
@@ -90,19 +96,19 @@ structs, enums, unions, traits, functions, type aliases, constants, statics.
   anchors account for them.
 - Doctest hidden lines (`# ...`) are stripped, `## ` shows `# `, and code-fence info strings are
   normalized to `rust` or the block's language.
-- Intra-doc links resolve through the JSON `links` map to `[text](basename#anchor)`, with no
-  directory and no `.md`. Items outside the documented crates link to docs.rs, and
+- [Intra-doc links][intra-doc] resolve through the JSON `links` map to `[text](basename#anchor)`,
+  with no directory and no `.md`. Items outside the documented crates link to docs.rs, and
   `std`/`core`/`alloc` to `doc.rust-lang.org/stable`. A link to an item that is not documented is
   left as plain text.
 - Signatures are in code blocks, so the types inside them are not links.
 
 ## Toolchain coupling
 
-- The flake pins the nightly (date) and `flake.lock`. The binary depends on the matching
-  `rustdoc-types` release (`=0.61.0`, format 61).
-- `checks.format-version` builds a fixture crate with the pinned toolchain and asserts that the
-  emitted `format_version` equals `rustdoc_types::FORMAT_VERSION`. It fails with instructions
-  when the two drift apart.
+- The flake ([`flake.nix`](flake.nix)) pins the nightly (date) and `flake.lock`. The binary depends
+  on the matching `rustdoc-types` release (`=0.61.0`, format 61, in [`Cargo.toml`](Cargo.toml)).
+- [`checks.format-version`](nix/check-format-version.nix) builds a fixture crate with the pinned
+  toolchain and asserts that the emitted `format_version` equals `rustdoc_types::FORMAT_VERSION`. It
+  fails with instructions when the two drift apart.
 - At runtime the binary checks `format_version` on every input, including `json-dir`, and fails
   with a clear error on mismatch.
 - The pinned `cargo`/`rustc`/`rustdoc` are used for the child processes only, not for later steps in
@@ -114,34 +120,35 @@ structs, enums, unions, traits, functions, type aliases, constants, statics.
 
 ## Implementation
 
-One crate, `rustdoc-wiki`, a library and a binary:
+One crate, `rustdoc-wiki`, a library and a binary. Each module below has a page in the
+[API documentation][api-docs].
 
 | Module | Job |
 | --- | --- |
-| `names` | Heading slugs the way GitHub computes them, per-page anchor de-duplication, page names, version validation |
-| `sig` | Pure functions that print rustdoc-json types, generics and signatures as Rust source |
-| `docs` | Doc-comment processing: link rewriting from source offsets (other bytes untouched), heading shift, fences, hidden lines |
-| `external` | URLs for items that are not on the wiki |
-| `render` | Plan (which page each item lives on, re-exports, globs) then emit |
-| `sidebar` | The managed region of `_Sidebar.md` |
-| `publish` | Clone, replace the owned directory, sidebar, commit, push with retry |
-| `build` | `cargo metadata`, docs.rs metadata, `cargo rustdoc` |
+| [`names`](src/names.rs) | Heading slugs the way GitHub computes them, per-page anchor de-duplication, page names, version validation |
+| [`sig`](src/sig.rs) | Pure functions that print rustdoc-json types, generics and signatures as Rust source |
+| [`docs`](src/docs.rs) | Doc-comment processing: link rewriting from source offsets (other bytes untouched), heading shift, fences, hidden lines |
+| [`external`](src/external.rs) | URLs for items that are not on the wiki |
+| [`render`](src/render.rs) | Plan (which page each item lives on, re-exports, globs) then emit |
+| [`sidebar`](src/sidebar.rs) | The managed region of `_Sidebar.md` |
+| [`publish`](src/publish.rs) | Clone, replace the owned directory, sidebar, commit, push with retry |
+| [`build`](src/build.rs) | `cargo metadata`, docs.rs metadata, `cargo rustdoc` |
 
 **Two-pass emit.** A link to an item needs the anchor GitHub will give its heading, and that depends
 on every heading before it on its page, including headings inside doc comments. So each page is
-emitted twice: the first pass records each item's anchor, and the second uses them. An integration
-test recomputes every anchor from the final Markdown with independent code and checks that each
-wiki link resolves.
+emitted twice: the first pass records each item's anchor, and the second uses them. An
+[integration test](tests/fixtures.rs) recomputes every anchor from the final Markdown with
+independent code and checks that each wiki link resolves.
 
 **CLI.** `run` (build, render, publish; what the action calls), `build`, `render`, `publish`,
 `format-version`. `GITHUB_REPOSITORY`, `GITHUB_SERVER_URL`, `GITHUB_SHA` and `GITHUB_TOKEN` are the
 defaults for the wiki URL, source links, commit message and authentication.
 
-**Action.** A composite action: install Nix if the runner has none, `nix build
-<action_path>#toolchain`, get the binary, run it. The binary comes from the release whose version
-matches `Cargo.toml` at the commit the action was checked out at, so `@v0` and pinned tags both
-work. Commits without a release, such as a branch or the local `uses: ./` used by this repo's own
-workflow, build the binary with Nix instead.
+**Action.** A composite action ([`action.yml`](action.yml)): install Nix if the runner has none,
+`nix build <action_path>#toolchain`, get the binary, run it. The binary comes from the release whose
+version matches `Cargo.toml` at the commit the action was checked out at, so `@v0` and pinned tags
+both work. Commits without a release, such as a branch or the local `uses: ./` used by this repo's
+[own workflow](.github/workflows/docs.yml), build the binary with Nix instead.
 
 **Publishing.** Clone `<repo>.wiki.git` (the token goes in through git's environment config, never
 the URL or argv), use the branch the clone checked out (not a hardcoded `master`), apply the owned
@@ -150,9 +157,17 @@ fetch, reset to the new tip, redo the change and retry (we only touch paths we o
 nothing to merge). Build and render are all-or-nothing: if any selected crate fails, nothing is
 published. If the wiki is disabled or has no first page, fail with instructions.
 
+**Documentation links.** Doc comments link to this file and the README, and to other items with
+intra-doc links, so the published wiki pages are linked the same way. Error messages that a user
+can act on end with a link to the relevant README section. A test keeps the links in the README and
+this file honest: [`tests/links.rs`](tests/links.rs) checks that every relative link points at a
+file that exists and every `#anchor` at a heading that exists.
+
 ## Wiki behavior (verified)
 
 Tested on 2026-09-30 against this repo's own wiki, with scratch pages that have since been removed.
+The links and anchors on the pages the action published were then checked against GitHub's
+rendering of the [live wiki][api-docs].
 
 1. **The namespace is flat.** `api/latest/x.md` is served at `/wiki/x`. `/wiki/api/latest/x` does
    not exist, and the page list shows basenames only. Two files with the same basename in different
@@ -178,7 +193,7 @@ Tested on 2026-09-30 against this repo's own wiki, with scratch pages that have 
 
 ## Rustdoc JSON, format 61 (verified)
 
-Things that are not obvious from the `rustdoc-types` documentation:
+Things that are not obvious from the [`rustdoc-types` documentation][rustdoc-types-docs]:
 
 - The `links` map is keyed by the destination exactly as written, backticks included: `` [`Foo`] ``
   gives the key `` "`Foo`" ``, and `[text](crate::a)` gives `"crate::a"`. Unresolvable links have no
@@ -201,17 +216,17 @@ Things that are not obvious from the `rustdoc-types` documentation:
 
 ## Risks and open items
 
-1. **The static Linux build is unverified.** `packages.rustdoc-wiki-static` is defined and
-   evaluates, but only the first CI run will show whether `outputChecks.out.allowedReferences = [ ]`
-   passes for `pkgsStatic`. Fallback: <https://github.com/gabyx/self-hoisted-nix>.
-2. **The action and workflows have not run.** `actionlint` and `shellcheck` are clean. The dogfood
-   workflow will publish this repository's own docs to its wiki on the first push to `lex`.
-3. **Standard library links** rely on the author-written path. An item that is only known by a
+1. **Standard library links** rely on the author-written path. An item that is only known by a
    private definition path, and was not written out in full, may link to a page that does not exist.
-4. **`targets` from docs.rs metadata** is ignored: docs are built for the host.
-5. **Nightly bumps are manual** until the scheduled workflow exists. A bump can change the rendered
+2. **The release path is unexercised.** The static Linux build passes CI on both architectures (and
+   runs with no Nix), but no release exists, so the action has only ever taken its build-from-source
+   fallback. Cutting the first release will exercise the release workflow, the download, and the
+   moving `v0` tag. If the static check ever stops passing, the fallback is
+   <https://github.com/gabyx/self-hoisted-nix>.
+3. **`targets` from docs.rs metadata** is ignored: docs are built for the host.
+4. **Nightly bumps are manual** until the scheduled workflow exists. A bump can change the rendered
    output; the snapshot tests show how.
-6. **Linux runners only.** Nix excludes Windows, and macOS runners are not a target.
+5. **Linux runners only.** Nix excludes Windows, and macOS runners are not a target.
 
 Not decided yet:
 
@@ -220,3 +235,10 @@ Not decided yet:
 - Whether the sidebar depth should be an input (it is fixed at two levels).
 - Hyperlinked types inside signatures. They would need HTML instead of code fences.
 - A trait "implementors" list.
+
+[api-docs]: https://github.com/philiptaron/rustdoc-wiki-action/wiki/latest-rustdoc_wiki
+[docs-rs-metadata]: https://docs.rs/about/metadata
+[intra-doc]: https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
+[rustdoc-json]: https://doc.rust-lang.org/nightly/rustdoc/unstable-features.html#-w--output-format-output-format
+[rustdoc-types]: https://docs.rs/rustdoc-types
+[rustdoc-types-docs]: https://docs.rs/rustdoc-types/0.61.0/rustdoc_types/

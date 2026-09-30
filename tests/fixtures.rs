@@ -3,13 +3,11 @@
 //! These tests run `cargo rustdoc` with `-Z unstable-options`, so they need the pinned nightly:
 //! run them inside `nix develop`.
 
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::path::Path;
-use std::process::Command;
+mod common;
 
-use pulldown_cmark::{Event, Options as MarkdownOptions, Parser, Tag, TagEnd};
-use rustdoc_wiki::names::Slugger;
+use std::path::Path;
+
+use common::{check_wiki_links, rustdoc_json};
 use rustdoc_wiki::render::{self, Options, Page};
 
 fn fixture_json(name: &str) -> Vec<u8> {
@@ -19,22 +17,7 @@ fn fixture_json(name: &str) -> Vec<u8> {
     let target = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join("fixtures")
         .join(name);
-    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let output = Command::new(cargo)
-        .current_dir(&dir)
-        .env("CARGO_TARGET_DIR", &target)
-        .args(["rustdoc", "--lib", "--quiet", "--"])
-        .args(["-Z", "unstable-options", "--output-format", "json"])
-        .output()
-        .expect("failed to run cargo");
-    assert!(
-        output.status.success(),
-        "`cargo rustdoc` failed for fixture {name}. These tests need the pinned nightly; run them \
-         inside `nix develop`.\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json = rustdoc_wiki::build::find_json(&target, name).expect("rustdoc wrote no JSON");
-    fs::read(json).expect("JSON is readable")
+    rustdoc_json(&dir, name, &target, &[])
 }
 
 fn render_fixture(name: &str) -> Vec<Page> {
@@ -69,81 +52,9 @@ fn basic_pages_match_snapshots() {
     });
 }
 
-/// The anchors GitHub will assign to the headings of `markdown`.
-fn anchors(markdown: &str) -> HashSet<String> {
-    let options = MarkdownOptions::ENABLE_TABLES
-        | MarkdownOptions::ENABLE_FOOTNOTES
-        | MarkdownOptions::ENABLE_STRIKETHROUGH
-        | MarkdownOptions::ENABLE_TASKLISTS;
-    let mut slugger = Slugger::default();
-    let mut found = HashSet::new();
-    let mut heading: Option<String> = None;
-    for event in Parser::new_ext(markdown, options) {
-        match event {
-            Event::Start(Tag::Heading { .. }) => heading = Some(String::new()),
-            Event::End(TagEnd::Heading(_)) => {
-                found.insert(slugger.anchor(&heading.take().unwrap_or_default()));
-            }
-            Event::Text(t) | Event::Code(t) => {
-                if let Some(h) = &mut heading {
-                    h.push_str(&t);
-                }
-            }
-            _ => {}
-        }
-    }
-    found
-}
-
-/// Every link that stays inside the wiki: `page`, `page#anchor` or `#anchor`.
-fn wiki_links(markdown: &str) -> Vec<String> {
-    Parser::new_ext(markdown, MarkdownOptions::ENABLE_TABLES)
-        .filter_map(|event| match event {
-            Event::Start(Tag::Link { dest_url, .. })
-                if !dest_url.contains(':') && !dest_url.contains('/') =>
-            {
-                Some(dest_url.to_string())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 #[test]
 fn every_wiki_link_resolves_to_a_page_and_heading() {
-    let pages = render_fixture("basic");
-    let by_name: HashMap<&str, HashSet<String>> = pages
-        .iter()
-        .map(|p| (p.basename.as_str(), anchors(&p.markdown)))
-        .collect();
-
-    let mut checked = 0;
-    for page in &pages {
-        for link in wiki_links(&page.markdown) {
-            let (target, anchor) = match link.split_once('#') {
-                Some((t, a)) => (
-                    if t.is_empty() {
-                        page.basename.as_str()
-                    } else {
-                        t
-                    },
-                    Some(a),
-                ),
-                None => (link.as_str(), None),
-            };
-            let headings = by_name
-                .get(target)
-                .unwrap_or_else(|| panic!("{}: link to unknown page {link:?}", page.basename));
-            if let Some(anchor) = anchor {
-                assert!(
-                    headings.contains(anchor),
-                    "{}: link {link:?} has no matching heading on {target}",
-                    page.basename
-                );
-            }
-            checked += 1;
-        }
-    }
+    let checked = check_wiki_links(&render_fixture("basic"));
     assert!(
         checked >= 15,
         "expected the fixture to exercise many links, saw {checked}"

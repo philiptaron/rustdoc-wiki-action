@@ -1,7 +1,11 @@
-//! Builds rustdoc JSON for the crates to document.
+//! Builds [rustdoc JSON] for the crates to document.
 //!
 //! Which crates, and with which features, comes from `cargo metadata` and each crate's
-//! `[package.metadata.docs.rs]`, so a crate documents itself the way it does on docs.rs.
+//! [`[package.metadata.docs.rs]`][docs-rs-metadata], so a crate documents itself the way it does
+//! on docs.rs.
+//!
+//! [rustdoc JSON]: https://doc.rust-lang.org/nightly/rustdoc/unstable-features.html#-w--output-format-output-format
+//! [docs-rs-metadata]: https://docs.rs/about/metadata
 
 use std::ffi::OsString;
 use std::fs;

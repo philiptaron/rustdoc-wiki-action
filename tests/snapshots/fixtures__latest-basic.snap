@@ -73,8 +73,6 @@ Built with [`Config::new`](latest-basic#fn-confignew). See the [`Mode`](latest-b
 
 Never fails.
 
-[helper]: crate::util::helper
-
 **Fields**
 
 - `pub extra: T`

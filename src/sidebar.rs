@@ -1,7 +1,9 @@
-//! The managed region of the wiki's `_Sidebar.md`.
+//! The managed region of the wiki's [`_Sidebar.md`][sidebar-docs].
 //!
 //! We own only what is between [`BEGIN`] and [`END`]; anything else in the sidebar is the
 //! user's. The contents are derived from the page names in the wiki, so no state is stored.
+//!
+//! [sidebar-docs]: https://docs.github.com/en/communities/documenting-your-project-with-wikis/creating-a-footer-or-sidebar-for-your-wiki
 
 use std::cmp::Reverse;
 use std::collections::BTreeMap;

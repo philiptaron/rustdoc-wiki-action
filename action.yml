@@ -44,7 +44,7 @@ runs:
       shell: bash
       run: |
         if [ "$RUNNER_OS" != Linux ]; then
-          echo "::error::rustdoc-wiki supports Linux runners only (this is $RUNNER_OS)."
+          echo "::error::rustdoc-wiki supports Linux runners only (this is $RUNNER_OS). See https://github.com/philiptaron/rustdoc-wiki-action#requirements-and-limitations"
           exit 1
         fi
         if command -v nix >/dev/null; then

@@ -14,7 +14,8 @@
     let
       # The nightly that emits the rustdoc JSON we render. Its `format_version` must equal
       # `rustdoc_types::FORMAT_VERSION` for the `rustdoc-types` release in Cargo.toml; the
-      # `format-version` check enforces that. Bump the two together.
+      # `format-version` check enforces that. Bump the two together; see
+      # https://github.com/philiptaron/rustdoc-wiki-action/blob/HEAD/DESIGN.md#toolchain-coupling
       nightly = "2026-09-29";
 
       systems = [

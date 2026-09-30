@@ -24,6 +24,14 @@ rustPlatform.buildRustPackage {
       ../Cargo.lock
       ../src
       ../tests
+      # `tests/links.rs` checks the links in the docs, the config and the workflows.
+      ../README.md
+      ../DESIGN.md
+      ../LICENSE
+      ../action.yml
+      ../flake.nix
+      ../nix
+      ../.github
     ];
   };
 

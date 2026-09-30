@@ -1,7 +1,9 @@
 //! Publishes rendered pages to the wiki's git repository.
 //!
-//! The wiki is a plain git repo. We clone it, replace the directory we own, refresh the sidebar's
-//! managed region, and push. See DESIGN.md, "Ownership rules".
+//! The wiki is a plain git repo. We clone it, replace the directory we own, refresh the
+//! [`sidebar`]'s managed region, and push. See [DESIGN.md, "Ownership rules"][ownership].
+//!
+//! [ownership]: https://github.com/philiptaron/rustdoc-wiki-action/blob/HEAD/DESIGN.md#ownership-rules
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -248,8 +250,9 @@ fn clone(p: &Publish, destination: &Path) -> Result<()> {
             "could not clone the wiki ({}). Either the repository's wiki is disabled, or it has \
              no pages yet: GitHub only creates the wiki's git repository when the first page is \
              saved. Enable Wikis in the repository settings and create a first page in the web \
-             UI, then run this again.\n{}",
+             UI, then run this again (see {}#quick-start).\n{}",
             p.wiki_url,
+            crate::HOMEPAGE,
             stderr.trim()
         );
     }

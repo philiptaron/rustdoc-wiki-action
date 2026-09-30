@@ -28,7 +28,8 @@ runCommand "check-format-version"
     if [ "$emitted" != "$supported" ]; then
       echo "The pinned nightly emits rustdoc JSON format_version $emitted, but this build of" >&2
       echo "rustdoc-types supports $supported. Bump the nightly date in flake.nix and the" >&2
-      echo "rustdoc-types version in Cargo.toml together." >&2
+      echo "rustdoc-types version in Cargo.toml together. Why:" >&2
+      echo "https://github.com/philiptaron/rustdoc-wiki-action/blob/HEAD/DESIGN.md#toolchain-coupling" >&2
       exit 1
     fi
     touch $out

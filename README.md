@@ -1,11 +1,13 @@
 # rustdoc-wiki-action
 
-Publish your Rust workspace's API documentation to your repository's GitHub wiki.
+Publish your Rust workspace's API documentation to your repository's [GitHub wiki][about-wikis].
 
-The action builds [rustdoc JSON](https://doc.rust-lang.org/nightly/rustdoc/unstable-features.html#-w--output-format-output-format)
-for your library crates, renders it as Markdown (one wiki page per module), and pushes the pages to
-`<repo>.wiki.git`. Signatures, docs, intra-doc links and source links all come out linked and
-readable on github.com.
+The action builds [rustdoc JSON][rustdoc-json] for your library crates, renders it as Markdown (one
+wiki page per module), and pushes the pages to `<repo>.wiki.git`. Signatures, docs, intra-doc links
+and source links all come out linked and readable on github.com.
+
+This repository documents itself that way: read its [API documentation][api-docs], which is
+published by [its own workflow](.github/workflows/docs.yml).
 
 ## Quick start
 
@@ -32,8 +34,8 @@ jobs:
 ```
 
 Before the first run, enable **Wikis** in the repository settings and **create a first page in the
-web UI**. GitHub only creates a wiki's git repository when its first page is saved, and the action
-cannot do that for you.
+web UI** (see [About wikis][about-wikis]). GitHub only creates a wiki's git repository when its
+first page is saved, and the action cannot do that for you.
 
 ### Release snapshots
 
@@ -59,6 +61,8 @@ jobs:
 
 ## Inputs
 
+These are the inputs of [`action.yml`](action.yml).
+
 | Input | Default | |
 | --- | --- | --- |
 | `version` | `latest` | Names this set of docs. It is the first part of every page name and the wiki directory the pages go in. Letters, digits, `.`, `_` and `-` only. |
@@ -68,7 +72,7 @@ jobs:
 | `private-items` | `false` | Document private items too. |
 | `json-dir` | | Use rustdoc JSON files from this directory instead of building. Their `format_version` must match the pinned nightly. |
 | `dry-run` | `false` | Report what would change, without committing or pushing. |
-| `github-token` | `github.token` | Needs `contents: write`. |
+| `github-token` | `github.token` | Needs `contents: write`. See [automatic token authentication][token]. |
 
 ## What ends up in the wiki
 
@@ -87,13 +91,15 @@ api/
 - **Ownership.** A run replaces `api/<version>/` and nothing else, apart from the block of
   `_Sidebar.md` between `<!-- rustdoc-wiki:begin -->` and `<!-- rustdoc-wiki:end -->`. Your `Home`
   page and the rest of your sidebar are untouched. Hand edits inside `api/<version>/` are
-  overwritten.
+  overwritten. ([Details][ownership].)
 - **Page names.** GitHub identifies a wiki page by its file name alone and ignores the directory, so
   every generated name starts with the version. Before writing, the action checks that no page it
   would create shares a name with any other page in the wiki (in any directory, ignoring case), and
-  fails instead of silently shadowing it.
+  fails instead of silently shadowing it. ([How GitHub's wiki behaves][wiki-behavior], which shaped
+  this layout.)
 - **Sidebar.** The managed block lists each crate and its modules two levels deep, for `latest`
-  (or, without one, the newest release), and links every version.
+  (or, without one, the newest release), and links every version. It lives in the wiki's
+  [sidebar][sidebar-docs].
 - **No churn.** Unchanged docs make no commit. Concurrent pushes to the wiki are retried on top of
   the new tip.
 
@@ -101,18 +107,19 @@ Each module page has the module's docs, then its modules, re-exports, macros, st
 traits, functions, type aliases, constants and statics. For each item: its signature, a link to its
 source at the commit that was built, a `deprecated` note, its docs, and its members (fields,
 variants, methods, trait items). Types list their trait implementations; auto-trait and blanket
-implementations are summarized.
+implementations are summarized. See [page contents][page-contents] for the rules.
 
 ## What gets documented
 
 - **Crates.** Every library crate in the workspace, or those named in `packages`.
 - **Items.** Public items only, unless `private-items` is set. Items that are only reachable
   through a `pub use` from a private module are documented where they are re-exported.
-- **Features.** Each crate's `[package.metadata.docs.rs]` is honored (`features`, `all-features`,
-  `no-default-features`, `rustdoc-args`), so a crate documents itself the way it does on docs.rs.
-  `targets` is ignored: docs are built for the host.
-- **Links.** Intra-doc links become links to the wiki page and heading. Items from other crates link
-  to docs.rs, and the standard library to doc.rust-lang.org. A link to something that is not
+- **Features.** Each crate's [`[package.metadata.docs.rs]`][docs-rs-metadata] is honored
+  (`features`, `all-features`, `no-default-features`, `rustdoc-args`), so a crate documents itself
+  the way it does on [docs.rs](https://docs.rs). `targets` is ignored: docs are built for the host.
+- **Links.** [Intra-doc links][intra-doc] become links to the wiki page and heading. Items from
+  other crates link to docs.rs, and the standard library to
+  [doc.rust-lang.org](https://doc.rust-lang.org/stable/std/). A link to something that is not
   documented is left as plain text.
 
 ## Requirements and limitations
@@ -121,9 +128,10 @@ implementations are summarized.
   [Nix](https://nixos.org), which the action installs if the runner does not have it. Windows and
   macOS runners are not supported.
 - **The pinned nightly.** rustdoc's JSON output is nightly-only and changes often, so each release
-  of this action pins one nightly and the matching `rustdoc-types`. Your crates must build with it;
-  a `rust-toolchain.toml` in your repository is ignored. If they cannot, build the JSON yourself and
-  pass `json-dir`.
+  of this action pins one nightly (in [`flake.nix`](flake.nix)) and the matching
+  [`rustdoc-types`](https://docs.rs/rustdoc-types) (in [`Cargo.toml`](Cargo.toml)). Your crates
+  must build with it; a `rust-toolchain.toml` in your repository is ignored. If they cannot, build
+  the JSON yourself and pass `json-dir`. ([Why the two are coupled][toolchain].)
 - **Native dependencies** of your crates are yours to install in an earlier step.
 - Signatures are shown in code blocks, so the types inside them are not hyperlinks.
 - Trait pages do not list implementors.
@@ -142,15 +150,31 @@ $ nix run . -- run --toolchain ./toolchain --dry-run --wiki-url git@github.com:y
 
 ```console
 $ nix develop        # the pinned nightly, rustfmt, clippy, cargo-insta
-$ cargo test         # unit, snapshot and end-to-end tests
+$ cargo test         # unit, snapshot, link and end-to-end tests
 $ cargo insta review # after an intended change to the rendered output
 $ nix flake check    # the same tests, hermetically, plus the format-version check
 ```
 
+[CI](.github/workflows/ci.yml) runs `nix flake check` and builds the static binary on x86_64 and
+aarch64; [releases](.github/workflows/release.yml) attach those binaries. Snapshot tests use
+[insta](https://insta.rs).
+
 The nightly in `flake.nix` and the `rustdoc-types` version in `Cargo.toml` are bumped together;
-`nix flake check` fails if they disagree. [DESIGN.md](DESIGN.md) records the decisions behind all
-of this, including how GitHub's wiki behaves, which shaped the page layout.
+`nix flake check` fails if they disagree. [DESIGN.md](DESIGN.md) records the decisions behind all of
+this.
 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+[about-wikis]: https://docs.github.com/en/communities/documenting-your-project-with-wikis/about-wikis
+[api-docs]: https://github.com/philiptaron/rustdoc-wiki-action/wiki/latest-rustdoc_wiki
+[docs-rs-metadata]: https://docs.rs/about/metadata
+[intra-doc]: https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
+[ownership]: DESIGN.md#ownership-rules
+[page-contents]: DESIGN.md#page-contents
+[rustdoc-json]: https://doc.rust-lang.org/nightly/rustdoc/unstable-features.html#-w--output-format-output-format
+[sidebar-docs]: https://docs.github.com/en/communities/documenting-your-project-with-wikis/creating-a-footer-or-sidebar-for-your-wiki
+[token]: https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication
+[toolchain]: DESIGN.md#toolchain-coupling
+[wiki-behavior]: DESIGN.md#wiki-behavior-verified
